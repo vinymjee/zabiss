@@ -1,13 +1,15 @@
 <?php
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-API-KEY');
 header('Access-Control-Allow-Credentials: true');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
 require_once __DIR__ . '/../config/database.php';
 
 $pdo = getPDO();
+// Migration v2 (ecoles + dossiers JSON + admin) idempotente MySQL/SQLite
+try { ensureV2Schema($pdo); } catch (Throwable $e) {}
 
 // Auto-migrate SQLite si besoin (dev local)
 if ((getenv('DB_DRIVER') ?: 'mysql') === 'sqlite') {
@@ -69,6 +71,18 @@ if (str_starts_with($path, '/api/paiements') || $path === '/api/parent/paiements
 }
 if (str_starts_with($path, '/api/infos')) {
     require __DIR__ . '/infos.php';
+    exit;
+}
+if (str_starts_with($path, '/api/ecoles')) {
+    require __DIR__ . '/ecoles.php';
+    exit;
+}
+if (str_starts_with($path, '/api/admin')) {
+    require __DIR__ . '/admin.php';
+    exit;
+}
+if (str_starts_with($path, '/api/externes') || str_starts_with($path, '/api/external')) {
+    require __DIR__ . '/externes.php';
     exit;
 }
 jsonResponse(['error'=>'Route non trouvée','path'=>$path], 404);

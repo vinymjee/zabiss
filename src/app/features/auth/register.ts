@@ -8,7 +8,9 @@ import { AuthService } from '../../core/auth.service';
   imports: [FormsModule, RouterLink],
   template: `
   <div class="auth-page">
-    <div class="auth-card card">
+    <div class="blob blob-a"></div>
+    <div class="blob blob-b"></div>
+    <div class="auth-card card animate-in">
       <div class="auth-header">
         <div class="logo">Z</div>
         <h1>Créer mon compte parent</h1>
@@ -39,16 +41,20 @@ import { AuthService } from '../../core/auth.service';
   </div>
   `,
   styles: [`
-  .auth-page{min-height:100vh; display:grid; grid-template-columns: 520px 1fr; background: linear-gradient(135deg,#f0fdfa,#f8fafc);}
-  .auth-card{margin:24px; padding:28px; align-self:center; border-radius:24px;}
+  .auth-page{position:relative; overflow:hidden; min-height:100vh; display:grid; grid-template-columns: 520px 1fr; background:linear-gradient(135deg,#f0fdfa,#f8fafc 50%,#ede9fe);}
+  .blob{position:absolute; border-radius:999px; filter:blur(70px); opacity:.5; pointer-events:none;}
+  .blob-a{width:420px; height:420px; background:#99f6e4; top:-120px; right:10%; animation:floatY 7s ease-in-out infinite;}
+  .blob-b{width:360px; height:360px; background:#ddd6fe; bottom:-120px; left:30%; animation:floatY 9s ease-in-out infinite reverse;}
+  .auth-card{position:relative; z-index:1; margin:24px; padding:30px; align-self:center; border-radius:26px; box-shadow:var(--shadow-lg);}
   .auth-header{text-align:center; margin-bottom:18px;}
-  .logo{width:56px;height:56px; border-radius:16px; background:linear-gradient(135deg,#0f766e,#14b8a6); color:white; display:grid; place-items:center; font-weight:800; font-size:22px; margin:0 auto 12px;}
+  .logo{width:60px; height:60px; border-radius:18px; background:linear-gradient(135deg,#14b8a6,#0f766e 55%,#7c3aed 130%); background-size:200% 200%; color:white; display:grid; place-items:center; font-weight:800; font-size:24px; margin:0 auto 12px; box-shadow:0 10px 26px rgba(20,184,166,.4); animation:gradientShift 5s ease infinite; transition:transform .25s var(--ease-spring);}
+  .logo:hover{transform:scale(1.08) rotate(-6deg);}
   .auth-header h1{font-size:22px;}
   .auth-header p{color:var(--text-muted); font-size:14px; margin-top:4px;}
   .alert{padding:10px 12px; border-radius:12px; font-size:13px; margin-bottom:12px; background:#fee2e2; color:#991b1b; border:1px solid #fecaca;}
   .auth-footer{text-align:center; margin-top:16px; font-size:13px; color:var(--text-muted);}
-  .auth-hero{padding:48px; display:flex; flex-direction:column; justify-content:center; max-width:640px;}
-  .auth-hero h2{font-size:32px; color:var(--primary);}
+  .auth-hero{position:relative; z-index:1; padding:48px; display:flex; flex-direction:column; justify-content:center; max-width:640px; animation:fadeUp .6s var(--ease-smooth) both;}
+  .auth-hero h2{font-size:34px; line-height:1.1; background:linear-gradient(90deg,#0f766e,#14b8a6 45%,#7c3aed); -webkit-background-clip:text; background-clip:text; color:transparent;}
   .auth-hero p{margin-top:14px; color:#334155;}
   .grid{ grid-template-columns:1fr 1fr; gap:12px; }
   @media(max-width:900px){ .auth-page{grid-template-columns:1fr;} .auth-hero{display:none;} }

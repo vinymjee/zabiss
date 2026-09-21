@@ -7,11 +7,11 @@ import { RouterLink } from '@angular/router';
   selector: 'app-enfants',
   imports: [FormsModule, RouterLink],
   template: `
-  <h1>Mes enfants</h1>
-  <p style="color:var(--text-muted); font-size:14px; margin-top:4px">Ajoutez chaque enfant avec les identifiants fournis par l'établissement (matricule + login + mot de passe élève). Espace contrôle : vérification côté école.</p>
+  <h1 class="animate-in">Mes enfants</h1>
+  <p class="animate-in" style="color:var(--text-muted); font-size:14px; margin-top:4px; --d:60ms">Ajoutez chaque enfant avec les identifiants fournis par l'établissement (matricule + login + mot de passe élève). Espace contrôle : vérification côté école.</p>
 
   <div class="grid grid-2" style="margin-top:16px">
-    <div class="card" style="padding:18px">
+    <div class="card animate-in" style="padding:20px; --d:120ms">
       <h3 style="margin-bottom:12px">Lier un nouvel élève</h3>
       @if (msg()) { <div class="alert" [class.error]="isError()" [class.success]="!isError()">{{msg()}}</div> }
       <form (ngSubmit)="lier()">
@@ -40,7 +40,7 @@ import { RouterLink } from '@angular/router';
       </div>
     </div>
 
-    <div class="card" style="padding:18px">
+    <div class="card animate-in" style="padding:20px; --d:180ms">
       <h3>Enfants liés ({{ eleves().length }})</h3>
       @if (eleves().length===0) { <p style="margin-top:12px; color:var(--text-muted); font-size:14px">Aucun enfant pour le moment.</p> }
       <div style="display:grid; gap:10px; margin-top:12px">
@@ -60,13 +60,15 @@ import { RouterLink } from '@angular/router';
   </div>
   `,
   styles: [`
-  h1{font-size:24px;}
-  .alert{padding:10px 12px; border-radius:12px; font-size:13px; margin-bottom:12px;}
+  h1{font-size:26px; background:linear-gradient(90deg,#0f766e,#14b8a6 50%,#7c3aed); -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .alert{padding:10px 12px; border-radius:12px; font-size:13px; margin-bottom:12px; animation:popIn .3s var(--ease-spring) both;}
   .alert.error{background:#fee2e2; color:#991b1b; border:1px solid #fecaca;}
   .alert.success{background:#dcfce7; color:#166534; border:1px solid #bbf7d0;}
   .hint{margin-top:12px; background:#f8fafc; border:1px solid var(--border); padding:10px; border-radius:12px; font-size:12px; line-height:1.7;}
-  .enfant-row{display:flex; gap:10px; align-items:center; padding:10px; border:1px solid var(--border); border-radius:12px; background:#f8fafc;}
-  .avatar{width:40px;height:40px; border-radius:999px; background:linear-gradient(135deg,#0f766e,#14b8a6); color:white; display:grid; place-items:center; font-weight:800; font-size:13px; flex-shrink:0;}
+  .enfant-row{display:flex; gap:10px; align-items:center; padding:12px; border:1px solid var(--border); border-radius:14px; background:#f8fafc; transition:transform .2s var(--ease-spring), box-shadow .2s, background .2s;}
+  .enfant-row:hover{transform:translateX(4px); background:white; box-shadow:var(--shadow);}
+  .avatar{width:42px; height:42px; border-radius:14px; background:linear-gradient(135deg,#14b8a6,#0f766e 55%,#7c3aed 130%); color:white; display:grid; place-items:center; font-weight:800; font-size:13px; flex-shrink:0; transition:transform .25s var(--ease-spring);}
+  .enfant-row:hover .avatar{transform:scale(1.08) rotate(-4deg);}
   `]
 })
 export class Enfants implements OnInit {

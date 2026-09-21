@@ -47,3 +47,5 @@ backend/zabiss.sqlite
 backend/zabiss.sqlite-journal
 .env
 dist/
+frontend.log
+*.log

@@ -8,8 +8,8 @@ import { EleveService } from '../../core/eleve.service';
   imports: [CommonModule, RouterLink],
   template: `
   @if (eleve()) {
-    <a routerLink="/dashboard" class="btn btn-ghost" style="margin-bottom:12px">← Retour</a>
-    <div class="card hero">
+    <a routerLink="/dashboard" class="btn btn-ghost animate-in" style="margin-bottom:12px">← Retour</a>
+    <div class="card hero animate-in" style="--d:80ms">
       <div class="avatar">{{ eleve().prenom[0] }}{{ eleve().nom[0] }}</div>
       <div>
         <h1>{{ eleve().prenom }} {{ eleve().nom }}</h1>
@@ -29,7 +29,7 @@ import { EleveService } from '../../core/eleve.service';
       </div>
     </div>
 
-    <div class="tabs">
+    <div class="tabs animate-in" style="--d:140ms">
       @for (t of tabs; track t.key) {
         <button class="tab" [class.active]="active()===t.key" (click)="active.set(t.key)">{{ t.label }}</button>
       }
@@ -166,18 +166,44 @@ import { EleveService } from '../../core/eleve.service';
   }
   `,
   styles: [`
-  .hero{display:flex; gap:16px; align-items:center; padding:18px; flex-wrap:wrap;}
-  .avatar{width:56px;height:56px; border-radius:16px; background:linear-gradient(135deg,#0f766e,#14b8a6); color:white; display:grid; place-items:center; font-weight:800; font-size:18px;}
-  h1{font-size:22px;}
+  .hero{
+    position:relative; overflow:hidden;
+    display:flex; gap:16px; align-items:center; padding:20px; flex-wrap:wrap;
+    background:linear-gradient(180deg,#ffffff,#f0fdfa);
+  }
+  .hero::before{content:''; position:absolute; inset:0 0 auto 0; height:4px; background:linear-gradient(90deg,#14b8a6,#7c3aed,#f59e0b);}
+  .avatar{
+    width:60px; height:60px; border-radius:18px;
+    background:linear-gradient(135deg,#14b8a6,#0f766e 55%,#7c3aed 130%); background-size:200% 200%;
+    color:white; display:grid; place-items:center; font-weight:800; font-size:19px;
+    box-shadow:0 8px 22px rgba(20,184,166,.4); animation:gradientShift 5s ease infinite;
+    transition:transform .25s var(--ease-spring);
+  }
+  .avatar:hover{transform:scale(1.06) rotate(-4deg);}
+  h1{font-size:24px;}
   .sub{font-size:13px; color:var(--text-muted); margin-top:2px;}
   .hero-kpis{margin-left:auto; display:flex; gap:12px; flex-wrap:wrap;}
-  .kpi-badge{background:#f8fafc; border:1px solid var(--border); border-radius:14px; padding:12px 16px; text-align:center;}
+  .kpi-badge{
+    background:#f8fafc; border:1px solid var(--border); border-radius:16px; padding:12px 18px; text-align:center;
+    transition:transform .2s var(--ease-spring), box-shadow .2s;
+  }
+  .kpi-badge:hover{transform:translateY(-3px); box-shadow:var(--shadow);}
   .kpi-label{font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;}
-  .kpi-val{font-size:20px; font-weight:800; margin-top:4px;}
-  .tabs{display:flex; gap:8px; margin-top:16px; overflow:auto; padding-bottom:2px;}
-  .tab{padding:10px 16px; border-radius:999px; border:1px solid var(--border); background:white; font-weight:600; font-size:13px; cursor:pointer; white-space:nowrap;}
-  .tab.active{background:var(--primary); color:white; border-color:var(--primary);}
-  .info-card{padding:14px; border:1px solid var(--border); border-radius:12px; background:#f8fafc;}
+  .kpi-val{font-size:22px; font-weight:800; margin-top:4px;}
+  .tabs{display:flex; gap:8px; margin-top:16px; overflow:auto; padding:4px 2px 6px;}
+  .tab{
+    padding:10px 18px; border-radius:999px; border:1px solid var(--border); background:white;
+    font-weight:700; font-size:13px; cursor:pointer; white-space:nowrap;
+    transition:transform .18s var(--ease-spring), background .2s, color .2s, box-shadow .2s, border-color .2s;
+  }
+  .tab:hover{transform:translateY(-2px); border-color:var(--primary); color:var(--primary); box-shadow:var(--shadow);}
+  .tab:active{transform:scale(.95);}
+  .tab.active{
+    background:linear-gradient(135deg,#0f766e,#14b8a6); color:white; border-color:transparent;
+    box-shadow:0 8px 20px rgba(15,118,110,.35); transform:translateY(-1px);
+  }
+  .info-card{padding:14px; border:1px solid var(--border); border-radius:14px; background:#f8fafc; transition:transform .2s var(--ease-spring), box-shadow .2s;}
+  .info-card:hover{transform:translateY(-3px); box-shadow:var(--shadow);}
   `]
 })
 export class EleveDetail implements OnInit {
