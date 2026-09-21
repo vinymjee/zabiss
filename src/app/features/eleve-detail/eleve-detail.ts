@@ -1,11 +1,12 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit, computed } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { EleveService } from '../../core/eleve.service';
 
 @Component({
   selector: 'app-eleve-detail',
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, FormsModule],
   template: `
   @if (eleve()) {
     <a routerLink="/dashboard" class="btn btn-ghost animate-in" style="margin-bottom:12px">← Retour</a>
@@ -36,6 +37,26 @@ import { EleveService } from '../../core/eleve.service';
     </div>
 
     @if (active()==='moyennes') {
+      <div class="card periode-bar animate-in" style="--d:180ms">
+        <label class="periode-label" for="periode-select">📅 Période</label>
+        <select id="periode-select" class="input periode-select" [(ngModel)]="periodeSel" (ngModelChange)="onPeriodeChange()">
+          <option value="toutes">Toutes les périodes</option>
+          @for (g of groupesPeriodes(); track g.type) {
+            <optgroup [label]="g.label">
+              @for (p of g.periodes; track p) {
+                <option [value]="p">{{ labelPeriode(p) }}</option>
+              }
+            </optgroup>
+          }
+        </select>
+        @if (periodeSel() !== 'toutes') {
+          <span class="badge badge-info">{{ labelPeriode(periodeSel()) }} : {{ moyennes()?.moyenneGenerale ?? '—' }}/20</span>
+          <button class="btn btn-ghost periode-reset" (click)="resetPeriode()">Réinitialiser</button>
+        } @else {
+          <span class="periode-hint">{{ periodesDisponibles().length }} période(s) stockée(s)</span>
+        }
+      </div>
+
       <div class="grid grid-2" style="margin-top:16px">
         <div class="card" style="padding:18px">
           <h3>Moyennes par matière</h3>
@@ -63,7 +84,7 @@ import { EleveService } from '../../core/eleve.service';
         </div>
         <div class="card" style="padding:18px">
           <h3>Détail des notes</h3>
-          <div style="margin-top:8px; display:flex; gap:8px"><span style="font-size:12px; color:var(--text-muted)">Toutes périodes confondues</span></div>
+          <div style="margin-top:8px; display:flex; gap:8px"><span style="font-size:12px; color:var(--text-muted)">@if (periodeSel() === 'toutes') { Toutes périodes confondues } @else { Période : {{ labelPeriode(periodeSel()) }} }</span></div>
           <div class="table-wrap" style="margin-top:12px; max-height:420px; overflow:auto">
             <table>
               <tr><th>Date</th><th>Matière</th><th>Période</th><th>Note</th></tr>
@@ -77,7 +98,7 @@ import { EleveService } from '../../core/eleve.service';
               }
             </table>
           </div>
-          @if (notes().length===0) { <p style="color:var(--text-muted); margin-top:8px; font-size:13px">Aucune note.</p> }
+          @if (notes().length===0) { <p style="color:var(--text-muted); margin-top:8px; font-size:13px">@if (periodeSel() === 'toutes') { Aucune note. } @else { Aucune note pour {{ labelPeriode(periodeSel()) }}. }</p> }
         </div>
       </div>
     }
@@ -204,6 +225,15 @@ import { EleveService } from '../../core/eleve.service';
   }
   .info-card{padding:14px; border:1px solid var(--border); border-radius:14px; background:#f8fafc; transition:transform .2s var(--ease-spring), box-shadow .2s;}
   .info-card:hover{transform:translateY(-3px); box-shadow:var(--shadow);}
+  .periode-bar{
+    display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+    padding:14px 16px; margin-top:14px;
+    background:linear-gradient(180deg,#ffffff,#f0fdfa);
+  }
+  .periode-label{font-size:13px; font-weight:800; white-space:nowrap;}
+  .periode-select{max-width:320px; cursor:pointer; font-weight:600;}
+  .periode-hint{font-size:12px; color:var(--text-muted);}
+  .periode-reset{padding:8px 14px; font-size:12px;}
   `]
 })
 export class EleveDetail implements OnInit {
@@ -217,6 +247,66 @@ export class EleveDetail implements OnInit {
   infos = signal<any[]>([]);
   active = signal<'moyennes'|'presences'|'paiements'|'infos'>('moyennes');
   tabs = [{key:'moyennes', label:'Moyennes & Notes'}, {key:'presences', label:'Présences'}, {key:'paiements', label:'Paiements'}, {key:'infos', label:'Infos'}] as const;
+  private eleveId = 0;
+  periodeSel = signal<string>('toutes');
+
+  // Périodes stockées : union des périodes des notes et des moyennes (backend renvoie `periodes`)
+  periodesDisponibles = computed(() => {
+    const set = new Set<string>();
+    const moy = this.moyennes();
+    (moy?.periodes ?? []).forEach((p: string) => p && set.add(p));
+    Object.keys(moy?.moyParPeriode ?? {}).forEach(p => p && set.add(p));
+    this.notes().forEach(n => n?.periode && set.add(n.periode));
+    return [...set].sort();
+  });
+
+  // Groupes du combo : Trimestre / Semestre / Bimestre / Mois / Autre — selon les données stockées
+  groupesPeriodes = computed(() => {
+    const groups: { type: string; label: string; periodes: string[] }[] = [
+      { type: 'trimestre', label: 'Trimestres', periodes: [] },
+      { type: 'semestre', label: 'Semestres', periodes: [] },
+      { type: 'bimestre', label: 'Bimestres', periodes: [] },
+      { type: 'mois', label: 'Mois', periodes: [] },
+      { type: 'autre', label: 'Autres périodes', periodes: [] },
+    ];
+    for (const p of this.periodesDisponibles()) {
+      groups.find(g => g.type === this.typePeriode(p))!.periodes.push(p);
+    }
+    return groups.filter(g => g.periodes.length);
+  });
+
+  typePeriode(code: string): string {
+    const c = (code || '').toUpperCase().trim();
+    if (/^T[1-9]/.test(c) || c.startsWith('TRIM')) return 'trimestre';
+    if (/^S[1-9]/.test(c) || c.startsWith('SEM')) return 'semestre';
+    if (/^B[1-9]/.test(c) || c.startsWith('BIM')) return 'bimestre';
+    if (/^M\d/.test(c) || c.startsWith('MOIS')) return 'mois';
+    return 'autre';
+  }
+
+  labelPeriode(code: string): string {
+    const c = (code || '').trim();
+    const u = c.toUpperCase();
+    let m = u.match(/^T([1-9]\d*)$/);
+    if (m) return `Trimestre ${m[1]} (${c})`;
+    m = u.match(/^S([1-9]\d*)$/);
+    if (m) return `Semestre ${m[1]} (${c})`;
+    m = u.match(/^B([1-9]\d*)$/);
+    if (m) return `Bimestre ${m[1]} (${c})`;
+    m = u.match(/^M(\d{1,2})$/);
+    if (m) return `Mois ${m[1]} (${c})`;
+    return c;
+  }
+
+  onPeriodeChange() { this.chargerNotesEtMoyennes(); }
+  resetPeriode() { this.periodeSel.set('toutes'); this.chargerNotesEtMoyennes(); }
+
+  private chargerNotesEtMoyennes() {
+    if (!this.eleveId) return;
+    const p = this.periodeSel() === 'toutes' ? undefined : this.periodeSel();
+    this.srv.notes(this.eleveId, p).subscribe(r => this.notes.set(r));
+    this.srv.moyennes(this.eleveId, p).subscribe(r => this.moyennes.set(r));
+  }
 
   get periodeKeys(){ const m=this.moyennes(); return m? Object.keys(m.moyParPeriode||{}):[]; }
   get mentionClass(){
@@ -233,9 +323,9 @@ export class EleveDetail implements OnInit {
 
   ngOnInit(){
     const id = Number(this.route.snapshot.paramMap.get('id'));
+    this.eleveId = id;
     this.srv.detail(id).subscribe(r=> this.eleve.set(r));
-    this.srv.notes(id).subscribe(r=> this.notes.set(r));
-    this.srv.moyennes(id).subscribe(r=> this.moyennes.set(r));
+    this.chargerNotesEtMoyennes();
     this.srv.presences(id).subscribe(r=> { this.presences.set(r.presences); this.presStats.set(r.stats); });
     this.srv.paiements(id).subscribe(r=> { this.paiements.set(r.paiements); this.payStats.set(r.stats); });
     // infos liées à l'établissement

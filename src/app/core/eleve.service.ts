@@ -19,7 +19,7 @@ export class EleveService {
   retirer(eleveId:number){ return this.api.delete(`/parent/eleves/${eleveId}`); }
   detail(id:number){ return this.api.get<Eleve>(`/eleves/${id}`); }
   notes(id:number, periode?:string){ return this.api.get<any[]>(`/eleves/${id}/notes`, periode?{periode}:undefined); }
-  moyennes(id:number){ return this.api.get<any>(`/eleves/${id}/moyennes`); }
+  moyennes(id:number, periode?:string){ return this.api.get<any>(`/eleves/${id}/moyennes`, periode?{periode}:undefined); }
   presences(id:number){ return this.api.get<{presences:any[], stats:any}>(`/eleves/${id}/presences`); }
   paiements(id:number){ return this.api.get<{paiements:any[], stats:any}>(`/eleves/${id}/paiements`); }
   infos(ecoleId?:number){ return this.api.get<any[]>('/infos', ecoleId?{ecole_id:String(ecoleId)}:undefined); }

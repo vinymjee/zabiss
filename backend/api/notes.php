@@ -24,13 +24,17 @@ if (preg_match('#^/api/eleves/(\d+)/moyennes$#', $path, $m) && $method === 'GET'
     $chk->execute([$sess['parent_id'],$eid]);
     if (!$chk->fetch()) jsonResponse(['error'=>'Non autorisé'],403);
 
+    // Filtre période optionnel (?periode=T1) : mêmes agrégats restreints à la période
+    $periodeFilter = $_GET['periode'] ?? null;
+    $periodeSql = $periodeFilter ? " AND n.periode=" . $pdo->quote($periodeFilter) . " " : "";
+
     // Moyenne par matière puis générale pondérée
     $stmt=$pdo->prepare("
         SELECT m.id, m.nom as matiere, m.code, m.coefficient as coef,
                AVG(n.note * 20 / n.note_sur) as moyenne_mat,
                COUNT(*) as nb_notes
         FROM notes n JOIN matieres m ON m.id=n.matiere_id
-        WHERE n.eleve_id=?
+        WHERE n.eleve_id=? $periodeSql
         GROUP BY m.id
     ");
     $stmt->execute([$eid]);
@@ -44,7 +48,7 @@ if (preg_match('#^/api/eleves/(\d+)/moyennes$#', $path, $m) && $method === 'GET'
     }
     $moyenneGenerale = $totalCoef ? round($totalPoints/$totalCoef,2) : null;
 
-    // Par période
+    // Par période (liste complète des périodes stockées, même si un filtre est actif)
     $stmt2=$pdo->prepare("
         SELECT n.periode, m.nom as matiere, m.coefficient as coef,
                AVG(n.note * 20 / n.note_sur) as moy
@@ -86,11 +90,20 @@ if (preg_match('#^/api/eleves/(\d+)/moyennes$#', $path, $m) && $method === 'GET'
         $effectif=count($moyennesClasse);
     }
 
+    // Liste distincte des périodes stockées (pour le combo frontend)
+    try {
+        $sp = $pdo->prepare("SELECT DISTINCT periode FROM notes WHERE eleve_id=? ORDER BY periode");
+        $sp->execute([$eid]);
+        $periodesStockees = array_values(array_filter(array_column($sp->fetchAll(), 'periode')));
+    } catch (Throwable $e) { $periodesStockees = array_keys($parPeriode); }
+
     jsonResponse([
         'parMatiere'=>$parMatiere,
         'moyenneGenerale'=>$moyenneGenerale,
         'parPeriode'=>$parPeriode,
         'moyParPeriode'=>$moyParPeriode,
+        'periodes'=>$periodesStockees,
+        'periodeFiltre'=>$periodeFilter,
         'rang'=>$rang,
         'effectif'=>$effectif,
         'mention'=> $moyenneGenerale!==null ? (
