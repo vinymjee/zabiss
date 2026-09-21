@@ -1,0 +1,37 @@
+# Alternative 1 seul container (économise RAM sur Micro 1GB)
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: zabiss_root
+      MYSQL_DATABASE: zabiss
+      MYSQL_USER: zabiss
+      MYSQL_PASSWORD: zabiss_secret
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uzabiss", "-pzabiss_secret"]
+      interval: 10s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: zabiss
+      DB_USER: zabiss
+      DB_PASS: zabiss_secret
+      DB_DRIVER: mysql
+    ports:
+      - "80:80"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:

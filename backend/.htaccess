@@ -1,0 +1,12 @@
+RewriteEngine On
+
+# Si fichier ou dossier existe, servir directement
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Toutes les routes /api/* vers api/index.php
+RewriteRule ^api/(.*)$ api/index.php [L,QSA]
+
+# Pour dev php -S : fallback
+ErrorDocument 404 /api/index.php

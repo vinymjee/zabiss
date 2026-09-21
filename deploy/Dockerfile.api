@@ -1,0 +1,18 @@
+FROM php:8.2-apache
+RUN docker-php-ext-install pdo pdo_mysql mysqli && a2enmod rewrite headers
+
+RUN echo "upload_max_filesize=20M\npost_max_size=20M" > /usr/local/etc/php/conf.d/zabiss.ini
+
+WORKDIR /var/www/html
+
+# Copie backend (sera surchargé en dev via volume, utile en prod)
+COPY backend/ /var/www/html/
+COPY deploy/api-vhost.conf /etc/apache2/sites-available/000-default.conf
+
+# init script pour prod
+COPY backend/init-db.php /var/www/html/init-db.php
+COPY deploy/entrypoint-api.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 80
+CMD ["/entrypoint.sh"]

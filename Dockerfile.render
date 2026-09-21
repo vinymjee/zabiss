@@ -1,0 +1,24 @@
+# Zabiss - Render/Koyeb monolith (sans carte, SQLite)
+FROM node:20-alpine AS frontend
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM php:8.2-apache
+RUN docker-php-ext-install pdo pdo_mysql pdo_sqlite mysqli sqlite3 && a2enmod rewrite headers
+RUN echo "upload_max_filesize=20M\npost_max_size=20M" > /usr/local/etc/php/conf.d/zabiss.ini
+
+WORKDIR /var/www/html
+
+COPY backend/ /var/www/html/backend/
+COPY --from=frontend /app/dist/zabiss/browser/ /var/www/html/
+
+COPY deploy/apache-monolith.conf /etc/apache2/sites-available/000-default.conf
+COPY deploy/entrypoint-render.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Render/Koyeb inject PORT (10000 ou 8000)
+EXPOSE 80
+CMD ["/entrypoint.sh"]
