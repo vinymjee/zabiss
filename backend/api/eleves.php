@@ -78,22 +78,42 @@ if (preg_match('#^/api/eleves/(\d+)$#', $path, $m) && $method === 'GET') {
     $eleve = $stmt->fetch();
     if (!$eleve) jsonResponse(['error' => 'Élève introuvable'], 404);
     unset($eleve['password_hash']);
-    // Dossiers JSON associés (clé unique) si présents
+    // Dossiers JSON associés (nouvelles clés : eleve -> "id", annuels -> "id|annee")
     try {
-        $ecoleId = $eleve['ecole_id'] ?? $eleve['etablissement_id'] ?? 1;
         $annee = $eleve['annee_scolaire'] ?? '2025-2026';
-        $cle = cleUnique((int)$eid, (int)$ecoleId, (string)$annee);
-        $eleve['cle_unique_calculee'] = $cle;
-        foreach (['eleve_dossiers' => 'dossier_eleve', 'notes_moyennes_dossiers' => 'dossier_notes', 'presence_dossiers' => 'dossier_presences', 'paiements_dossiers' => 'dossier_paiements'] as $tbl => $k) {
+        $eleve['cle_unique_calculee'] = cleUniqueEleve((int)$eid);
+        $eleve['cle_unique_annee'] = cleUniqueAnnee((int)$eid, (string)$annee);
+        $dossierTables = [
+            'eleve_dossiers' => ['out' => 'dossier_eleve', 'cle' => cleUniqueEleve((int)$eid)],
+            'notes_moyennes_dossiers' => ['out' => 'dossier_notes', 'cle' => cleUniqueAnnee((int)$eid, (string)$annee)],
+            'presence_dossiers' => ['out' => 'dossier_presences', 'cle' => cleUniqueAnnee((int)$eid, (string)$annee)],
+            'paiements_dossiers' => ['out' => 'dossier_paiements', 'cle' => cleUniqueAnnee((int)$eid, (string)$annee)],
+        ];
+        foreach ($dossierTables as $tbl => $cfg) {
             try {
-                $s = $pdo->prepare("SELECT donnees_json, updated_at FROM $tbl WHERE cle_unique=? LIMIT 1");
-                $s->execute([$cle]);
-                if ($row = $s->fetch()) {
-                    $eleve[$k] = json_decode($row['donnees_json'], true);
-                    $eleve[$k . '_maj'] = $row['updated_at'];
+                $s = $pdo->prepare("SELECT * FROM $tbl WHERE cle_unique=? LIMIT 1");
+                $s->execute([$cfg['cle']]);
+                $row = $s->fetch();
+                // Fallback legacy "E_C_A"
+                if (!$row) {
+                    $ecoleId = $eleve['ecole_id'] ?? $eleve['etablissement_id'] ?? 1;
+                    $legacy = $eid . '_' . $ecoleId . '_' . $annee;
+                    $s = $pdo->prepare("SELECT * FROM $tbl WHERE cle_unique=? LIMIT 1");
+                    $s->execute([$legacy]);
+                    $row = $s->fetch();
+                }
+                if ($row) {
+                    $eleve[$cfg['out']] = json_decode($row['donnees_json'] ?? '{}', true);
+                    $eleve[$cfg['out'] . '_maj'] = $row['updated_at'] ?? null;
+                    if (!empty($row['donnees_csv'])) {
+                        $eleve[$cfg['out'] . '_csv'] = $row['donnees_csv'];
+                        try { $eleve[$cfg['out'] . '_blocs'] = parseCsvBlocs($row['donnees_csv']); } catch (Throwable $e) {}
+                    }
                 }
             } catch (Throwable $e) {}
         }
+        // Années disponibles (sélecteur affiché seulement si > 1)
+        try { $eleve['annees_disponibles'] = anneesDisponibles($pdo, (int)$eid); } catch (Throwable $e) {}
     } catch (Throwable $e) {}
     jsonResponse($eleve);
 }

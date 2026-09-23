@@ -5,7 +5,7 @@ import { environment } from '../../environments/environment';
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private http = inject(HttpClient);
-  private base = environment.apiUrl; // ex: http://localhost:8080/api
+  private base = environment.apiUrl; // ex: http://localhost:8081/api
 
   get<T>(path: string, params?: Record<string,string>) {
     return this.http.get<T>(`${this.base}${path}`, { params });

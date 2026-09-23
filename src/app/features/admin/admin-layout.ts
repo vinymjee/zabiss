@@ -32,7 +32,7 @@ import { AdminService } from '../../core/admin.service';
       </div>
     </aside>
     <div class="main">
-      <header class="topbar"><div class="topbar-title">Administration — clé unique <code>id_eleve_ecole_année</code></div></header>
+      <header class="topbar"><div class="topbar-title">Administration — clé <code>id eleve</code> / <code>id|année</code></div></header>
       <div class="content"><router-outlet /></div>
     </div>
   </div>

@@ -1,6 +1,9 @@
 -- Zabiss v2 - Ecoles + dossiers JSON + admin
--- Clé primaire unique : cle_unique = "{id_eleve}_{id_ecole}_{annee_scolaire}" ex: "12_3_2025-2026"
--- Chaque dossier stocke l'intégralité des données de l'année en JSON (donnees_json)
+-- Clés primaires uniques :
+--   eleve_dossiers : cle_unique = "{id_eleve}" ex: "12" (identité JSON)
+--   notes_moyennes_dossiers / presence_dossiers / paiements_dossiers :
+--     cle_unique = "{id_eleve}|{annee_scolaire}" ex: "12|2025-2026",
+--     une ligne par élève et par année, données en JSON (donnees_json)
 
 CREATE TABLE IF NOT EXISTS ecoles (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -33,7 +36,7 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
   FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Dossier ELEVE : 1 ligne par cle_unique (eleve + ecole + année)
+-- Dossier ELEVE : 1 ligne par élève (cle_unique = id eleve), identité en JSON
 CREATE TABLE IF NOT EXISTS eleve_dossiers (
   cle_unique VARCHAR(120) PRIMARY KEY,
   eleve_id INT NOT NULL,
@@ -46,7 +49,7 @@ CREATE TABLE IF NOT EXISTS eleve_dossiers (
   INDEX idx_eleve_dossiers_ecole (ecole_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Dossier NOTES + MOYENNES : 1 ligne par cle_unique, JSON = {notes:[...], moyennes:{...}}
+-- Dossier NOTES + MOYENNES : 1 ligne par élève et par année (cle_unique = id|annee), JSON = {notes:[...], moyennes:{...}}
 CREATE TABLE IF NOT EXISTS notes_moyennes_dossiers (
   cle_unique VARCHAR(120) PRIMARY KEY,
   eleve_id INT NOT NULL,
@@ -59,7 +62,7 @@ CREATE TABLE IF NOT EXISTS notes_moyennes_dossiers (
   INDEX idx_notes_dossiers_ecole (ecole_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Dossier PRESENCE : 1 ligne par cle_unique, JSON = {lignes:[...], stats:{...}}
+-- Dossier PRESENCE : 1 ligne par élève et par année (cle_unique = id|annee), JSON = {lignes:[...], stats:{...}}
 CREATE TABLE IF NOT EXISTS presence_dossiers (
   cle_unique VARCHAR(120) PRIMARY KEY,
   eleve_id INT NOT NULL,
@@ -72,7 +75,7 @@ CREATE TABLE IF NOT EXISTS presence_dossiers (
   INDEX idx_presence_dossiers_ecole (ecole_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Dossier PAIEMENTS : 1 ligne par cle_unique, JSON = {paiements:[...], stats:{...}}
+-- Dossier PAIEMENTS : 1 ligne par élève et par année (cle_unique = id|annee), JSON = {paiements:[...], stats:{...}}
 CREATE TABLE IF NOT EXISTS paiements_dossiers (
   cle_unique VARCHAR(120) PRIMARY KEY,
   eleve_id INT NOT NULL,

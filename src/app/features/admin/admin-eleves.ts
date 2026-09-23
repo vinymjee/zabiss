@@ -24,7 +24,7 @@ import { AdminService } from '../../core/admin.service';
           <tr>
             <td><strong>{{ e.prenom }} {{ e.nom }}</strong><br><span style="font-size:12px; color:var(--text-muted)">{{ e.matricule }} · {{ e.login }}</span></td>
             <td style="font-size:12px">{{ e.ecole_nom }}<br>ID {{ e.ecole_id }} · {{ e.annee_scolaire }}</td>
-            <td><code style="font-size:11px">{{ e.cle_unique || (e.id + '_' + (e.ecole_id||1) + '_' + (e.annee_scolaire||'2025-2026')) }}</code></td>
+            <td><code style="font-size:11px">eleve:{{ e.cle_unique || e.id }} · année:{{ e.id }}|{{ e.annee_scolaire || '2025-2026' }}</code></td>
             <td><button class="btn btn-ghost" style="font-size:12px" (click)="voir(e.id)">Voir</button></td>
           </tr>
         }

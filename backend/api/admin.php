@@ -103,15 +103,31 @@ if (preg_match('#^/api/admin/eleves/(\d+)$#', $path, $m) && $method === 'GET') {
     $eleve = $stmt->fetch();
     if (!$eleve) jsonResponse(['error' => 'Introuvable'], 404);
     unset($eleve['password_hash']);
-    $ecoleId = $eleve['ecole_id'] ?? $eleve['etablissement_id'] ?? 1;
-    $annee = $eleve['annee_scolaire'] ?? '2025-2026';
-    $cle = cleUnique((int)$eid, (int)$ecoleId, (string)$annee);
-    $eleve['cle_unique_calculee'] = $cle;
+    $eleve['cle_unique_calculee'] = cleUniqueEleve((int)$eid);
+    try { $eleve['annees_disponibles'] = anneesDisponibles($pdo, (int)$eid); } catch (Throwable $e) { $eleve['annees_disponibles'] = []; }
+    $wantedAnnee = trim($_GET['annee_scolaire'] ?? '');
+    $queries = [
+        'eleve_dossiers' => [cleUniqueEleve((int)$eid)],
+        'notes_moyennes_dossiers' => $wantedAnnee ? [cleUniqueAnnee((int)$eid, $wantedAnnee)] : null,
+        'presence_dossiers' => $wantedAnnee ? [cleUniqueAnnee((int)$eid, $wantedAnnee)] : null,
+        'paiements_dossiers' => $wantedAnnee ? [cleUniqueAnnee((int)$eid, $wantedAnnee)] : null,
+    ];
     foreach (['eleve_dossiers', 'notes_moyennes_dossiers', 'presence_dossiers', 'paiements_dossiers'] as $tbl) {
         try {
-            $s = $pdo->prepare("SELECT * FROM $tbl WHERE cle_unique=? LIMIT 1");
-            $s->execute([$cle]);
-            $eleve[$tbl] = $s->fetch() ?: null;
+            if ($queries[$tbl] !== null) {
+                $s = $pdo->prepare("SELECT * FROM $tbl WHERE cle_unique=? LIMIT 1");
+                $s->execute([$queries[$tbl][0]]);
+                $eleve[$tbl] = $s->fetch() ?: null;
+            } else {
+                $s = $pdo->prepare("SELECT * FROM $tbl WHERE eleve_id=? ORDER BY annee_scolaire DESC");
+                $s->execute([(int)$eid]);
+                $rows = $s->fetchAll();
+                $eleve[$tbl] = $rows ?: null;
+                if (is_array($eleve[$tbl])) {
+                    foreach ($eleve[$tbl] as &$rr) { $rr['donnees'] = json_decode($rr['donnees_json'] ?? '{}', true); }
+                }
+                continue;
+            }
             if ($eleve[$tbl] && isset($eleve[$tbl]['donnees_json'])) {
                 $eleve[$tbl]['donnees'] = json_decode($eleve[$tbl]['donnees_json'], true);
             }
@@ -132,9 +148,9 @@ if ($path === '/api/admin/eleves' && $method === 'POST') {
         $pdo->prepare("INSERT INTO eleves (matricule, login, password_hash, nom, prenom, date_naissance, sexe, classe_id, etablissement_id, ecole_id, annee_scolaire) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
             ->execute([$b['matricule'], $b['login'], hashPassword($pwd), $b['nom'], $b['prenom'], $b['date_naissance'] ?? null, $b['sexe'] ?? 'M', $b['classe_id'] ?? null, $ecoleId, $ecoleId, $annee]);
         $id = (int)$pdo->lastInsertId();
-        $cle = cleUnique($id, $ecoleId, $annee);
+        $cle = cleUniqueEleve($id);
         try { $pdo->prepare("UPDATE eleves SET cle_unique=? WHERE id=?")->execute([$cle, $id]); } catch (Throwable $e) {}
-        jsonResponse(['ok' => true, 'id' => $id, 'cle_unique' => $cle], 201);
+        jsonResponse(['ok' => true, 'id' => $id, 'cle_unique' => $cle, 'cle_annee' => cleUniqueAnnee($id, $annee)], 201);
     } catch (Throwable $e) { jsonResponse(['error' => 'Matricule/login déjà utilisé'], 409); }
 }
 
@@ -156,7 +172,12 @@ if ($path === '/api/admin/dossiers' && $method === 'GET') {
                 $s = $pdo->query("SELECT * FROM $tbl ORDER BY updated_at DESC LIMIT 100");
             }
             $rows = $s->fetchAll();
-            foreach ($rows as &$r) { $r['donnees'] = json_decode($r['donnees_json'] ?? '{}', true); }
+            foreach ($rows as &$r) {
+                $r['donnees'] = json_decode($r['donnees_json'] ?? '{}', true);
+                if (!empty($r['donnees_csv'])) {
+                    try { $r['blocs'] = parseCsvBlocs($r['donnees_csv']); } catch (Throwable $e) { $r['blocs'] = []; }
+                }
+            }
             $out[$tbl] = $rows;
         } catch (Throwable $e) { $out[$tbl] = []; }
     }

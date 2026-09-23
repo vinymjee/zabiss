@@ -4,6 +4,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { EleveService } from '../../core/eleve.service';
 
+export interface BlocCsv { meta: string[]; headers: string[] | null; rows: string[][]; }
+
 @Component({
   selector: 'app-eleve-detail',
   imports: [CommonModule, RouterLink, FormsModule],
@@ -14,7 +16,17 @@ import { EleveService } from '../../core/eleve.service';
       <div class="avatar">{{ eleve().prenom[0] }}{{ eleve().nom[0] }}</div>
       <div>
         <h1>{{ eleve().prenom }} {{ eleve().nom }}</h1>
-        <div class="sub">{{ eleve().matricule }} · {{ eleve().classe }} · {{ eleve().etablissement }} · {{ eleve().annee_scolaire }}</div>
+        <div class="sub">{{ eleve().matricule }} · {{ eleve().classe }} · {{ eleve().etablissement }} · {{ anneeSel() || eleve().annee_scolaire }}</div>
+        @if (annees().length > 1) {
+          <div class="annee-row">
+            <label class="annee-label" for="annee-select">📚 Année scolaire</label>
+            <select id="annee-select" class="input annee-select" [(ngModel)]="anneeSel" (ngModelChange)="onAnneeChange()">
+              @for (a of annees(); track a) {
+                <option [value]="a">{{ a }} @if ($first) { (la plus récente) }</option>
+              }
+            </select>
+          </div>
+        }
       </div>
       <div class="hero-kpis">
         @if (moyennes()?.moyenneGenerale !== null) {
@@ -57,6 +69,41 @@ import { EleveService } from '../../core/eleve.service';
         }
       </div>
 
+      @if (blocsNotesAffiches().length) {
+        <div style="display:grid; gap:16px; margin-top:16px">
+          @for (b of blocsNotesAffiches(); track $index) {
+            <div class="card csv-block animate-in">
+              <div class="csv-head">
+                <div class="csv-title">{{ b.meta[0] || 'Période' }}</div>
+                <div class="csv-chips">
+                  @if (b.meta[1]) { <span class="badge badge-info">Rang {{ b.meta[1] }}</span> }
+                  @if (b.meta[2]) { <span class="badge badge-success">Moy {{ b.meta[2] }}/20</span> }
+                  @if (b.meta[3]) { <span class="badge badge-warning">{{ b.meta[3] }}</span> }
+                  @if (b.meta[4]) { <span class="badge badge-neutral">1er : {{ b.meta[4] }}</span> }
+                </div>
+              </div>
+              <div class="table-wrap" style="margin-top:12px">
+                <table>
+                  @if (b.headers?.length) {
+                    <tr>
+                      @for (h of b.headers; track $index; let hi = $index) {
+                        <th [class.num]="hi>0">{{ h }}</th>
+                      }
+                    </tr>
+                  }
+                  @for (r of b.rows; track $index) {
+                    <tr>
+                      @for (c of r; track $index; let ci = $index) {
+                        <td [class.num]="ci>0">@if (ci===0) { <strong>{{ c }}</strong> } @else { {{ c }} }</td>
+                      }
+                    </tr>
+                  }
+                </table>
+              </div>
+            </div>
+          }
+        </div>
+      } @else {
       <div class="grid grid-2" style="margin-top:16px">
         <div class="card" style="padding:18px">
           <h3>Moyennes par matière</h3>
@@ -101,6 +148,7 @@ import { EleveService } from '../../core/eleve.service';
           @if (notes().length===0) { <p style="color:var(--text-muted); margin-top:8px; font-size:13px">@if (periodeSel() === 'toutes') { Aucune note. } @else { Aucune note pour {{ labelPeriode(periodeSel()) }}. }</p> }
         </div>
       </div>
+      }
     }
 
     @if (active()==='presences') {
@@ -113,6 +161,44 @@ import { EleveService } from '../../core/eleve.service';
             <div class="kpi card" style="box-shadow:none"><div class="kpi-label">Retards</div><div class="kpi-value" style="color:var(--warning)">{{presStats().retards}}</div></div>
           </div>
         }
+        @if (blocsPresences().length) {
+          <div style="display:grid; gap:16px; margin-top:16px">
+            @for (b of blocsPresences(); track $index) {
+              <div class="card csv-block animate-in">
+                <div class="csv-head">
+                  <div class="csv-title">{{ b.meta[0] || 'Période' }}</div>
+                  <div class="csv-chips">
+                    @if (b.meta[1]) { <span class="badge badge-neutral">{{ b.meta[1] }} jour(s)</span> }
+                    @if (b.meta[2]) { <span class="badge badge-success">{{ b.meta[2] }} présent(s)</span> }
+                    @if (b.meta[3]) { <span class="badge badge-danger">{{ b.meta[3] }} absent(s)</span> }
+                    @if (b.meta[4]) { <span class="badge badge-warning">{{ b.meta[4] }} retard(s)</span> }
+                    @if (b.meta[5]) { <span class="badge badge-info">{{ b.meta[5] }}%</span> }
+                  </div>
+                </div>
+                <div class="table-wrap" style="margin-top:12px">
+                  <table>
+                    @if (b.headers?.length) {
+                      <tr>
+                        @for (h of b.headers; track $index) {
+                          <th>{{ h }}</th>
+                        }
+                      </tr>
+                    }
+                    @for (r of b.rows; track $index) {
+                      <tr>
+                        @for (c of r; track $index; let ci = $index) {
+                          <td>@if (ci===1) {
+                            <span class="badge" [ngClass]="{'badge-success':c==='present','badge-danger':c==='absent','badge-warning':c==='retard','badge-info':c==='exclu','badge-neutral':c!=='present'&&c!=='absent'&&c!=='retard'&&c!=='exclu'}">{{ c }}</span>
+                          } @else { {{ c || '—' }} }</td>
+                        }
+                      </tr>
+                    }
+                  </table>
+                </div>
+              </div>
+            }
+          </div>
+        } @else {
         <div class="table-wrap" style="margin-top:16px">
           <table>
             <tr><th>Date</th><th>Statut</th><th>Motif</th><th>Justifié</th></tr>
@@ -128,6 +214,7 @@ import { EleveService } from '../../core/eleve.service';
             }
           </table>
         </div>
+        }
       </div>
     }
 
@@ -225,6 +312,9 @@ import { EleveService } from '../../core/eleve.service';
   }
   .info-card{padding:14px; border:1px solid var(--border); border-radius:14px; background:#f8fafc; transition:transform .2s var(--ease-spring), box-shadow .2s;}
   .info-card:hover{transform:translateY(-3px); box-shadow:var(--shadow);}
+  .annee-row{display:flex; gap:10px; align-items:center; margin-top:10px; flex-wrap:wrap;}
+  .annee-label{font-size:12px; font-weight:800; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em;}
+  .annee-select{max-width:260px; cursor:pointer; font-weight:700;}
   .periode-bar{
     display:flex; gap:12px; align-items:center; flex-wrap:wrap;
     padding:14px 16px; margin-top:14px;
@@ -234,6 +324,12 @@ import { EleveService } from '../../core/eleve.service';
   .periode-select{max-width:320px; cursor:pointer; font-weight:600;}
   .periode-hint{font-size:12px; color:var(--text-muted);}
   .periode-reset{padding:8px 14px; font-size:12px;}
+  .csv-block{padding:18px; position:relative; overflow:hidden;}
+  .csv-block::before{content:''; position:absolute; inset:0 0 auto 0; height:3px; background:linear-gradient(90deg,#14b8a6,#7c3aed,#f59e0b);}
+  .csv-head{display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap;}
+  .csv-title{font-weight:800; font-size:17px;}
+  .csv-chips{display:flex; gap:8px; flex-wrap:wrap;}
+  th.num, td.num{text-align:center;}
   `]
 })
 export class EleveDetail implements OnInit {
@@ -242,13 +338,25 @@ export class EleveDetail implements OnInit {
   eleve = signal<any>(null);
   notes = signal<any[]>([]);
   moyennes = signal<any>(null);
-  presences = signal<any[]>([]); presStats = signal<any>(null);
+  presences = signal<any[]>([]); presStats = signal<any>(null); presBlocs = signal<BlocCsv[]>([]);
+
+  // Blocs CSV notes : filtrés sur la période du combo (repli : tous les blocs)
+  blocsNotesAffiches(): BlocCsv[] {
+    const all: BlocCsv[] = this.moyennes()?.blocs ?? [];
+    const sel = this.periodeSel();
+    if (sel === 'toutes' || !all.length) return all;
+    const f = all.filter(b => (b.meta?.[0] || '') === sel);
+    return f.length ? f : all;
+  }
+  blocsPresences(): BlocCsv[] { return this.presBlocs(); }
   paiements = signal<any[]>([]); payStats = signal<any>(null);
   infos = signal<any[]>([]);
   active = signal<'moyennes'|'presences'|'paiements'|'infos'>('moyennes');
   tabs = [{key:'moyennes', label:'Moyennes & Notes'}, {key:'presences', label:'Présences'}, {key:'paiements', label:'Paiements'}, {key:'infos', label:'Infos'}] as const;
   private eleveId = 0;
   periodeSel = signal<string>('toutes');
+  annees = signal<string[]>([]);
+  anneeSel = signal<string>(''); // '' = année la plus récente (défaut backend)
 
   // Périodes stockées : union des périodes des notes et des moyennes (backend renvoie `periodes`)
   periodesDisponibles = computed(() => {
@@ -300,12 +408,37 @@ export class EleveDetail implements OnInit {
 
   onPeriodeChange() { this.chargerNotesEtMoyennes(); }
   resetPeriode() { this.periodeSel.set('toutes'); this.chargerNotesEtMoyennes(); }
+  onAnneeChange() { this.periodeSel.set('toutes'); this.chargerTout(); }
+
+  private anneeParam(): string | undefined {
+    return this.anneeSel() || undefined;
+  }
 
   private chargerNotesEtMoyennes() {
     if (!this.eleveId) return;
     const p = this.periodeSel() === 'toutes' ? undefined : this.periodeSel();
-    this.srv.notes(this.eleveId, p).subscribe(r => this.notes.set(r));
-    this.srv.moyennes(this.eleveId, p).subscribe(r => this.moyennes.set(r));
+    const a = this.anneeParam();
+    this.srv.notes(this.eleveId, p, a).subscribe(r => this.notes.set(r));
+    this.srv.moyennes(this.eleveId, p, a).subscribe(r => {
+      this.moyennes.set(r);
+      if (r?.annees?.length) this.annees.set(r.annees);
+      if (r?.annee_active && !this.anneeSel()) this.anneeSel.set(r.annee_active);
+    });
+  }
+
+  private chargerTout() {
+    if (!this.eleveId) return;
+    const a = this.anneeParam();
+    this.chargerNotesEtMoyennes();
+    this.srv.presences(this.eleveId, a).subscribe(r => {
+      this.presences.set(r.presences); this.presStats.set(r.stats);
+      this.presBlocs.set(r?.blocs ?? []);
+      if (r?.annees?.length) this.annees.set(r.annees);
+    });
+    this.srv.paiements(this.eleveId, a).subscribe(r => {
+      this.paiements.set(r.paiements); this.payStats.set(r.stats);
+      if (r?.annees?.length) this.annees.set(r.annees);
+    });
   }
 
   get periodeKeys(){ const m=this.moyennes(); return m? Object.keys(m.moyParPeriode||{}):[]; }
@@ -324,10 +457,17 @@ export class EleveDetail implements OnInit {
   ngOnInit(){
     const id = Number(this.route.snapshot.paramMap.get('id'));
     this.eleveId = id;
-    this.srv.detail(id).subscribe(r=> this.eleve.set(r));
-    this.chargerNotesEtMoyennes();
-    this.srv.presences(id).subscribe(r=> { this.presences.set(r.presences); this.presStats.set(r.stats); });
-    this.srv.paiements(id).subscribe(r=> { this.paiements.set(r.paiements); this.payStats.set(r.stats); });
+    const anneeQ = this.route.snapshot.queryParamMap.get('annee');
+    if (anneeQ && /^\d{4}-\d{4}$/.test(anneeQ)) this.anneeSel.set(anneeQ);
+    this.srv.detail(id).subscribe((r: any)=> {
+      this.eleve.set(r);
+      if (r?.annees_disponibles?.length) this.annees.set(r.annees_disponibles);
+    });
+    this.srv.annees(id).subscribe(r=> {
+      if (r?.annees?.length) this.annees.set(r.annees);
+      if (r?.annee_active && !this.anneeSel()) this.anneeSel.set(r.annee_active);
+    });
+    this.chargerTout();
     // infos liées à l'établissement
     this.srv.infos().subscribe(r=> this.infos.set(r));
     // switch via query param

@@ -30,10 +30,10 @@ GET /api/externes/health  →  &#123; ok, ecole: &#123; id, code, nom &#125; &#1
   -H "Content-Type: application/json" -H "X-API-KEY: zbk_TA_CLE" \\
   -d '&#123;"matricule":"MAT-2025-001","annee_scolaire":"2025-2026",
     "notes":[&#123;"matiere":"Mathématiques","code":"MATH","periode":"T1","type_eval":"composition","note":14,"note_sur":20,"coefficient":3&#125;]&#125;'
-# → &#123;"ok":true,"cle_unique":"1_1_2025-2026","notes_synced":1&#125;</pre>
+# → &#123;"ok":true,"cle_unique":"1|2025-2026","notes_synced":1&#125;</pre>
 
     <h3 style="margin-top:16px">Clé unique</h3>
-    <p style="font-size:13px">Format <code>id_eleve_ecole_année</code> ex: <code>12_3_2025-2026</code>. Un dossier par table : <code>eleve_dossiers</code>, <code>notes_moyennes_dossiers</code>, <code>presence_dossiers</code>, <code>paiements_dossiers</code> — colonne <code>donnees_json</code>.</p>
+    <p style="font-size:13px">Table <code>eleve_dossiers</code> : clé <code>id eleve</code> ex: <code>12</code>. Tables <code>notes_moyennes_dossiers</code>, <code>presence_dossiers</code>, <code>paiements_dossiers</code> : clé <code>id eleve|année scolaire</code> ex: <code>12|2025-2026</code> — une ligne par élève et par année, données en JSON (<code>donnees_json</code>).</p>
   </div>
   `,
   styles: [`code{background:#f5f3ff; padding:2px 6px; border-radius:6px; border:1px solid #ddd6fe;}`]

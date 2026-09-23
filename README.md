@@ -34,13 +34,14 @@ zabiss/
 
 ```bash
 # Backend PHP (SQLite, pas besoin de MySQL)
+# Port 8081 (le 8080 est réservé par pro-academy sur ce poste)
 cd backend
-DB_DRIVER=sqlite php -S 127.0.0.1:8080 router.php
+DB_DRIVER=sqlite php -S 127.0.0.1:8081 router.php
 
 # Frontend
 npm install
 npm start
-# Ouvre http://localhost:4200 (proxy vers http://localhost:8080/api)
+# Ouvre http://localhost:4200 (proxy vers http://localhost:8081/api)
 # Ou build prod: npm run build -> dist/zabiss
 ```
 

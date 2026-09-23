@@ -46,9 +46,9 @@ if (str_starts_with($path, '/api/auth')) {
     exit;
 }
 // Eleves : détail et sous-ressources
-if (preg_match('#^/api/eleves/\d+/(notes|moyennes|presences|paiements|infos)$#', $path)) {
+if (preg_match('#^/api/eleves/\d+/(notes|moyennes|presences|paiements|infos|annees)$#', $path)) {
     // dispatch selon suffix
-    if (str_ends_with($path, '/notes') || str_ends_with($path, '/moyennes')) { require __DIR__ . '/notes.php'; exit; }
+    if (str_ends_with($path, '/notes') || str_ends_with($path, '/moyennes') || str_ends_with($path, '/annees')) { require __DIR__ . '/notes.php'; exit; }
     if (str_ends_with($path, '/presences')) { require __DIR__ . '/presences.php'; exit; }
     if (str_ends_with($path, '/paiements')) { require __DIR__ . '/paiements.php'; exit; }
     if (str_ends_with($path, '/infos')) { require __DIR__ . '/infos.php'; exit; }

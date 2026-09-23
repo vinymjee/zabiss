@@ -11,7 +11,7 @@ import { AdminService } from '../../core/admin.service';
       <div class="card kpi"><div class="kpi-label">Parents</div><div class="kpi-value">{{ stats().parents }}</div></div>
       <div class="card kpi"><div class="kpi-label">Élèves</div><div class="kpi-value">{{ stats().eleves }}</div></div>
       <div class="card kpi"><div class="kpi-label">Écoles</div><div class="kpi-value">{{ stats().ecoles }}</div></div>
-      <div class="card kpi"><div class="kpi-label">Dossiers élève (JSON)</div><div class="kpi-value">{{ stats().dossiers_eleve }}</div><div class="kpi-sub">clé id_eleve_ecole_année</div></div>
+      <div class="card kpi"><div class="kpi-label">Dossiers élève (JSON)</div><div class="kpi-value">{{ stats().dossiers_eleve }}</div><div class="kpi-sub">clé = id eleve</div></div>
       <div class="card kpi"><div class="kpi-label">Dossiers notes/moyennes</div><div class="kpi-value">{{ stats().dossiers_notes }}</div></div>
       <div class="card kpi"><div class="kpi-label">Dossiers présences / paiements</div><div class="kpi-value">{{ stats().dossiers_presences }} / {{ stats().dossiers_paiements }}</div></div>
     </div>
@@ -19,7 +19,7 @@ import { AdminService } from '../../core/admin.service';
       <h3>Modèle de données</h3>
       <p style="font-size:13px; color:var(--text-muted); margin-top:6px">
         Tables : <code>ecoles</code>, <code>eleve_dossiers</code>, <code>notes_moyennes_dossiers</code>, <code>presence_dossiers</code>, <code>paiements_dossiers</code>.<br>
-        Chaque dossier : <code>cle_unique = id_eleve _ id_ecole _ annee_scolaire</code> (ex: <code>12_3_2025-2026</code>) + <code>donnees_json</code>.<br>
+        <code>eleve_dossiers</code> : clé <code>id eleve</code> (ex: <code>12</code>). Autres tables : clé <code>id eleve|année</code> (ex: <code>12|2025-2026</code>), une ligne par élève et par année + <code>donnees_json</code>.<br>
         Les applis externes poussent via <code>X-API-KEY</code> (clé de l'école) — voir page API externes.
       </p>
     </div>

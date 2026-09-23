@@ -1,6 +1,6 @@
 <?php
 // API externe pour applications écoles : auth via X-API-KEY (clé de l'école)
-// Chaque écriture crée/maj le dossier JSON indexé par cle_unique = "{id_eleve}_{id_ecole}_{annee}"
+// Clés : eleve_dossiers -> "{id_eleve}" ; notes/presences/paiements -> "{id_eleve}|{annee}" (1 ligne / élève / année)
 // + synchronise les tables normalisées (notes, presences, paiements) pour affichage parent.
 
 function resolveEleveExterne(PDO $pdo, array $ecole, array $body): ?array {
@@ -35,16 +35,37 @@ function resolveEleveExterne(PDO $pdo, array $ecole, array $body): ?array {
     return null;
 }
 
-function upsertDossier(PDO $pdo, string $table, string $cle, int $eleveId, int $ecoleId, string $annee, array $donnees): void {
+function upsertDossier(PDO $pdo, string $table, string $cle, int $eleveId, int $ecoleId, string $annee, array $donnees, ?string $csv = null): void {
     $json = json_encode($donnees, JSON_UNESCAPED_UNICODE);
     $driver = getenv('DB_DRIVER') ?: 'mysql';
+    $hasCsv = columnExists($pdo, $table, 'donnees_csv');
     if ($driver === 'sqlite') {
-        $pdo->prepare("INSERT INTO $table (cle_unique, eleve_id, ecole_id, annee_scolaire, donnees_json, updated_at) VALUES (?,?,?,?,?,datetime('now')) ON CONFLICT(cle_unique) DO UPDATE SET donnees_json=excluded.donnees_json, updated_at=datetime('now')")
-            ->execute([$cle, $eleveId, $ecoleId, $annee, $json]);
+        if ($hasCsv) {
+            $pdo->prepare("INSERT INTO $table (cle_unique, eleve_id, ecole_id, annee_scolaire, donnees_json, donnees_csv, updated_at) VALUES (?,?,?,?,?,?,datetime('now')) ON CONFLICT(cle_unique) DO UPDATE SET donnees_json=excluded.donnees_json, donnees_csv=excluded.donnees_csv, updated_at=datetime('now')")
+                ->execute([$cle, $eleveId, $ecoleId, $annee, $json, $csv]);
+        } else {
+            $pdo->prepare("INSERT INTO $table (cle_unique, eleve_id, ecole_id, annee_scolaire, donnees_json, updated_at) VALUES (?,?,?,?,?,datetime('now')) ON CONFLICT(cle_unique) DO UPDATE SET donnees_json=excluded.donnees_json, updated_at=datetime('now')")
+                ->execute([$cle, $eleveId, $ecoleId, $annee, $json]);
+        }
     } else {
-        $pdo->prepare("INSERT INTO $table (cle_unique, eleve_id, ecole_id, annee_scolaire, donnees_json) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE donnees_json=VALUES(donnees_json)")
-            ->execute([$cle, $eleveId, $ecoleId, $annee, $json]);
+        if ($hasCsv) {
+            $pdo->prepare("INSERT INTO $table (cle_unique, eleve_id, ecole_id, annee_scolaire, donnees_json, donnees_csv) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE donnees_json=VALUES(donnees_json), donnees_csv=VALUES(donnees_csv)")
+                ->execute([$cle, $eleveId, $ecoleId, $annee, $json, $csv]);
+        } else {
+            $pdo->prepare("INSERT INTO $table (cle_unique, eleve_id, ecole_id, annee_scolaire, donnees_json) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE donnees_json=VALUES(donnees_json)")
+                ->execute([$cle, $eleveId, $ecoleId, $annee, $json]);
+        }
     }
+}
+
+// CSV fourni par l'appli externe : on le valide (≥1 bloc) et on le normalise (fins de ligne)
+function validerCsvBlocs($csv): ?string {
+    if (!is_string($csv) || trim($csv) === '') return null;
+    $norm = str_replace(["\r\n", "\r"], "\n", $csv);
+    if (substr($norm, -1) !== "\n") $norm .= "\n";
+    $blocs = parseCsvBlocs($norm);
+    if (!$blocs) return null;
+    return $norm;
 }
 
 // ---- Health ----
@@ -85,7 +106,7 @@ if (($path === '/api/externes/eleves' || $path === '/api/external/eleves') && $m
             ->execute([$b['matricule'], $b['login'], hashPassword($b['password'] ?? 'eleve123'), $b['nom'], $b['prenom'], $b['date_naissance'] ?? null, $b['sexe'] ?? 'M', $b['classe_id'] ?? null, $ecole['id'], $ecole['id'], $annee]);
         $eleveId = (int)$pdo->lastInsertId();
     }
-    $cle = cleUnique($eleveId, (int)$ecole['id'], $annee);
+    $cle = cleUniqueEleve($eleveId);
     try { $pdo->prepare("UPDATE eleves SET cle_unique=? WHERE id=?")->execute([$cle, $eleveId]); } catch (Throwable $e) {}
     $s = $pdo->prepare("SELECT * FROM eleves WHERE id=?");
     $s->execute([$eleveId]);
@@ -106,9 +127,11 @@ if (($path === '/api/externes/notes' || $path === '/api/external/notes') && $met
     if (!$eleve) jsonResponse(['error' => 'Élève introuvable (fournis eleve_id, matricule ou cle_unique)'], 404);
     $annee = $b['annee_scolaire'] ?? $eleve['annee_scolaire'] ?? '2025-2026';
     $eleveId = (int)$eleve['id'];
-    $cle = cleUnique($eleveId, (int)$ecole['id'], $annee);
+    $cle = cleUniqueAnnee($eleveId, $annee);
+    // L'appli externe peut pousser directement le CSV à blocs (::periode / :entêtes / lignes)
+    $csvFourni = validerCsvBlocs($b['csv'] ?? null);
     $notesIn = $b['notes'] ?? [];
-    if (!is_array($notesIn) || !count($notesIn)) jsonResponse(['error' => 'Tableau notes requis'], 400);
+    if (!$csvFourni && (!is_array($notesIn) || !count($notesIn))) jsonResponse(['error' => 'Tableau notes ou champ csv requis'], 400);
 
     // Sync normalisé : résoudre/créer matières puis insérer notes
     $synced = 0;
@@ -139,8 +162,11 @@ if (($path === '/api/externes/notes' || $path === '/api/external/notes') && $met
     }
     // Dossier JSON (notes brutes + moyennes fournies ou calculées à la lecture)
     $dossier = ['cle_unique' => $cle, 'eleve_id' => $eleveId, 'ecole' => $ecole['nom'], 'annee_scolaire' => $annee, 'notes' => $notesIn, 'moyennes' => ($b['moyennes'] ?? null), 'nb_synced' => $synced, 'source' => 'externe'];
-    upsertDossier($pdo, 'notes_moyennes_dossiers', $cle, $eleveId, (int)$ecole['id'], $annee, $dossier);
-    jsonResponse(['ok' => true, 'cle_unique' => $cle, 'notes_synced' => $synced]);
+    // CSV : fourni tel quel par l'école, sinon régénéré depuis les tables (blocs ::periode / :entêtes)
+    $csv = $csvFourni ?? buildNotesCsvFromDb($pdo, $eleveId, $annee);
+    if ($csv === '') $csv = null;
+    upsertDossier($pdo, 'notes_moyennes_dossiers', $cle, $eleveId, (int)$ecole['id'], $annee, $dossier, $csv);
+    jsonResponse(['ok' => true, 'cle_unique' => $cle, 'notes_synced' => $synced, 'csv' => (bool)$csv]);
 }
 
 // ---- Ingest PRESENCES ----
@@ -151,9 +177,11 @@ if (($path === '/api/externes/presences' || $path === '/api/external/presences')
     if (!$eleve) jsonResponse(['error' => 'Élève introuvable'], 404);
     $annee = $b['annee_scolaire'] ?? $eleve['annee_scolaire'] ?? '2025-2026';
     $eleveId = (int)$eleve['id'];
-    $cle = cleUnique($eleveId, (int)$ecole['id'], $annee);
+    $cle = cleUniqueAnnee($eleveId, $annee);
+    $csvFourni = validerCsvBlocs($b['csv'] ?? null);
     $lignes = $b['lignes'] ?? $b['presences'] ?? [];
-    if (!is_array($lignes) || !count($lignes)) jsonResponse(['error' => 'Tableau lignes/presences requis'], 400);
+    if (!$csvFourni && (!is_array($lignes) || !count($lignes))) jsonResponse(['error' => 'Tableau lignes/presences ou champ csv requis'], 400);
+    if (!is_array($lignes)) $lignes = [];
     $synced = 0;
     foreach ($lignes as $l) {
         $date = $l['date_jour'] ?? $l['date'] ?? null;
@@ -172,8 +200,10 @@ if (($path === '/api/externes/presences' || $path === '/api/external/presences')
         }
         $synced++;
     }
-    upsertDossier($pdo, 'presence_dossiers', $cle, $eleveId, (int)$ecole['id'], $annee, ['cle_unique' => $cle, 'lignes' => $lignes, 'nb_synced' => $synced, 'source' => 'externe']);
-    jsonResponse(['ok' => true, 'cle_unique' => $cle, 'presences_synced' => $synced]);
+    $csv = $csvFourni ?? buildPresenceCsvFromDb($pdo, $eleveId, $annee);
+    if ($csv === '') $csv = null;
+    upsertDossier($pdo, 'presence_dossiers', $cle, $eleveId, (int)$ecole['id'], $annee, ['cle_unique' => $cle, 'lignes' => $lignes, 'nb_synced' => $synced, 'source' => 'externe'], $csv);
+    jsonResponse(['ok' => true, 'cle_unique' => $cle, 'presences_synced' => $synced, 'csv' => (bool)$csv]);
 }
 
 // ---- Ingest PAIEMENTS ----
@@ -184,7 +214,7 @@ if (($path === '/api/externes/paiements' || $path === '/api/external/paiements')
     if (!$eleve) jsonResponse(['error' => 'Élève introuvable'], 404);
     $annee = $b['annee_scolaire'] ?? $eleve['annee_scolaire'] ?? '2025-2026';
     $eleveId = (int)$eleve['id'];
-    $cle = cleUnique($eleveId, (int)$ecole['id'], $annee);
+    $cle = cleUniqueAnnee($eleveId, $annee);
     $pays = $b['paiements'] ?? [];
     if (!is_array($pays) || !count($pays)) jsonResponse(['error' => 'Tableau paiements requis'], 400);
     $synced = 0;
